@@ -6,22 +6,26 @@ import '../core/services/connectivity_service.dart';
 import '../core/services/queue_manager.dart';
 import '../core/services/background_service_manager.dart';
 import '../core/services/advanced_permission_service.dart';
+import '../core/services/sms_parser_service.dart';
 
 // Data Sources
 import '../data/datasources/payment_remote_datasource.dart';
 import '../data/datasources/unmatched_payment_remote_datasource.dart';
 import '../data/datasources/permission_local_datasource.dart';
 import '../data/datasources/sms_local_datasource.dart';
+import '../data/datasources/sms_message_local_datasource.dart';
 
 // Repositories
 import '../data/repositories/payment_repository_impl.dart';
 import '../data/repositories/unmatched_payment_repository_impl.dart';
 import '../data/repositories/permission_repository_impl.dart';
 import '../data/repositories/sms_repository_impl.dart';
+import '../data/repositories/sms_message_repository_impl.dart';
 import '../domain/repositories/payment_repository.dart';
 import '../domain/repositories/unmatched_payment_repository.dart';
 import '../domain/repositories/permission_repository.dart';
 import '../domain/repositories/sms_repository.dart';
+import '../domain/repositories/sms_message_repository.dart';
 
 // Use Cases
 import '../domain/usecases/watch_payments_by_status.dart';
@@ -29,12 +33,17 @@ import '../domain/usecases/update_payment_status.dart';
 import '../domain/usecases/delete_payment.dart';
 import '../domain/usecases/permission_usecases.dart';
 import '../domain/usecases/sms_usecases.dart';
+import '../domain/usecases/sms_message_usecases.dart';
+
+// Services
+import '../domain/services/sms_inbox_service.dart';
 
 // BLoCs
 import '../presentation/bloc/permission/permission_bloc.dart';
 import '../presentation/bloc/request/request_bloc.dart';
 import '../presentation/bloc/pending/pending_bloc.dart';
 import '../presentation/bloc/history/history_bloc.dart';
+import '../presentation/bloc/sms_inbox/sms_inbox_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -55,6 +64,10 @@ Future<void> init() async {
     () => BackgroundServiceManager.instance,
   );
 
+  sl.registerLazySingleton<SmsParserService>(
+    () => SmsParserService.instance,
+  );
+
   // Data sources
   sl.registerLazySingleton<PaymentRemoteDataSource>(
     () => PaymentRemoteDataSourceImpl(firestore: sl()),
@@ -70,6 +83,10 @@ Future<void> init() async {
 
   sl.registerLazySingleton<SmsLocalDataSource>(
     () => SmsLocalDataSourceImpl(),
+  );
+
+  sl.registerLazySingleton<SmsMessageLocalDataSource>(
+    () => SmsMessageLocalDataSourceImpl(),
   );
 
   // Repositories
@@ -101,7 +118,26 @@ Future<void> init() async {
     ),
   );
 
-  // Use cases
+  sl.registerLazySingleton<SmsMessageRepository>(
+    () => SmsMessageRepositoryImpl(
+      localDataSource: sl(),
+    ),
+  );
+
+  // Services
+  sl.registerLazySingleton<SmsInboxService>(
+    () => SmsInboxService.instance,
+  );
+
+  // SMS Message Use cases
+  sl.registerLazySingleton(() => GetAllSmsMessages(sl()));
+  sl.registerLazySingleton(() => GetPaymentMessages(sl()));
+  sl.registerLazySingleton(() => SaveSmsMessage(sl()));
+  sl.registerLazySingleton(() => WatchAllSmsMessages(sl()));
+  sl.registerLazySingleton(() => WatchPaymentMessages(sl()));
+  sl.registerLazySingleton(() => DeleteSmsMessage(sl()));
+
+  // Existing Use cases
   sl.registerLazySingleton(() => WatchPaymentsByStatus(sl()));
   sl.registerLazySingleton(() => UpdatePaymentStatus(sl()));
   sl.registerLazySingleton(() => DeletePayment(sl()));
@@ -111,6 +147,9 @@ Future<void> init() async {
   sl.registerLazySingleton(() => StopSmsMonitoring(sl()));
   sl.registerLazySingleton(() => GetSmsPaymentStream(sl()));
   sl.registerLazySingleton(() => ParseSmsMessage(sl()));
+
+  // Initialize SMS Inbox Service with dependencies
+  sl<SmsInboxService>().initialize(saveSmsMessage: sl());
 
   // BLoCs
   sl.registerFactory(() => PermissionBloc(
@@ -133,5 +172,12 @@ Future<void> init() async {
   sl.registerFactory(() => HistoryBloc(
     watchPaymentsByStatus: sl(),
     deletePayment: sl(),
+  ));
+
+  sl.registerFactory(() => SmsInboxBloc(
+    getAllSmsMessages: sl(),
+    getPaymentMessages: sl(),
+    watchAllSmsMessages: sl(),
+    smsInboxService: sl(),
   ));
 }

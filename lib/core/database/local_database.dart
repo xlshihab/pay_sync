@@ -1,15 +1,18 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../constants/app_constants.dart';
 
 class LocalDatabase {
   static Database? _database;
   static const String _databaseName = 'pay_sync_local.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2; // Updated version for SMS table
 
   // Table names
   static const String _queueTable = 'sms_queue';
   static const String _settingsTable = 'app_settings';
+  static const String _smsMessagesTable = 'sms_messages';
+
+  // Getter to access table names from outside
+  static String get smsMessagesTable => _smsMessagesTable;
 
   static Future<Database> get database async {
     if (_database != null) return _database!;
@@ -44,12 +47,31 @@ class LocalDatabase {
       )
     ''');
 
+    // SMS Messages table
+    await db.execute('''
+      CREATE TABLE $_smsMessagesTable (
+        id TEXT PRIMARY KEY,
+        sender TEXT NOT NULL,
+        body TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        is_payment_message INTEGER DEFAULT 0,
+        amount REAL,
+        sender_phone TEXT,
+        reference TEXT,
+        transaction_id TEXT,
+        balance REAL,
+        fee REAL,
+        payment_type INTEGER,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
     // App settings table
     await db.execute('''
       CREATE TABLE $_settingsTable (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL
       )
     ''');
 
@@ -60,6 +82,26 @@ class LocalDatabase {
     // Handle database upgrades here
     if (oldVersion < newVersion) {
       // Add migration logic if needed
+      if (oldVersion < 2) {
+        // Add SMS messages table
+        await db.execute('''
+          CREATE TABLE $_smsMessagesTable (
+            id TEXT PRIMARY KEY,
+            sender TEXT NOT NULL,
+            body TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            is_payment_message INTEGER DEFAULT 0,
+            amount REAL,
+            sender_phone TEXT,
+            reference TEXT,
+            transaction_id TEXT,
+            balance REAL,
+            fee REAL,
+            payment_type INTEGER,
+            created_at INTEGER NOT NULL
+          )
+        ''');
+      }
     }
   }
 
