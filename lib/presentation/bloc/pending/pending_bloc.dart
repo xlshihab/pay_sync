@@ -4,6 +4,10 @@ import 'package:equatable/equatable.dart';
 import '../../../domain/entities/unmatched_payment.dart';
 import '../../../domain/usecases/sms_usecases.dart';
 import '../../../domain/repositories/unmatched_payment_repository.dart';
+import '../../../core/services/background_service_manager.dart';
+import '../../../core/services/advanced_permission_service.dart';
+import '../../../core/services/queue_manager.dart';
+import '../../../injection/injection_container.dart' as di;
 
 // Events
 abstract class PendingEvent extends Equatable {
@@ -133,34 +137,93 @@ class PendingBloc extends Bloc<PendingEvent, PendingState> {
     StartSmsMonitoringEvent event,
     Emitter<PendingState> emit,
   ) async {
-    final result = await startSmsMonitoring();
+    try {
+      emit(PendingLoading());
 
-    result.fold(
-      (failure) => emit(PendingError(failure.message)),
-      (_) {
-        _smsMonitoringActive = true;
-        emit(SmsMonitoringStarted());
-        _startListeningToSmsStream();
-      },
-    );
+      // Step 1: Check and request advanced permissions
+      final permissionService = di.sl<AdvancedPermissionService>();
+      final permissionResult = await permissionService.checkAdvancedPermissions();
+
+      await permissionResult.fold(
+        (failure) async {
+          emit(PendingError('Permission check failed: ${failure.message}'));
+          return;
+        },
+        (hasPermissions) async {
+          if (!hasPermissions) {
+            // Request permissions
+            final requestResult = await permissionService.requestAdvancedPermissions();
+            await requestResult.fold(
+              (failure) async {
+                emit(PendingError('Required permissions not granted: ${failure.message}'));
+                return;
+              },
+              (granted) async {
+                if (!granted) {
+                  emit(const PendingError('Advanced permissions are required for background SMS monitoring'));
+                  return;
+                }
+              },
+            );
+          }
+        },
+      );
+
+      // Step 2: Start SMS monitoring
+      final smsResult = await startSmsMonitoring();
+      await smsResult.fold(
+        (failure) async {
+          emit(PendingError(failure.message));
+        },
+        (_) async {
+          // Step 3: Start background service
+          final backgroundService = di.sl<BackgroundServiceManager>();
+          final serviceResult = await backgroundService.startForegroundService();
+
+          await serviceResult.fold(
+            (failure) async {
+              print('Background service start failed: ${failure.message}');
+              // Continue without background service, just show warning
+            },
+            (_) async {
+              print('Background service started successfully');
+            },
+          );
+
+          _smsMonitoringActive = true;
+          emit(SmsMonitoringStarted());
+          _startListeningToSmsStream();
+        },
+      );
+    } catch (e) {
+      emit(PendingError('Failed to start SMS monitoring: ${e.toString()}'));
+    }
   }
 
   Future<void> _onStopSmsMonitoring(
     StopSmsMonitoringEvent event,
     Emitter<PendingState> emit,
   ) async {
-    await _smsSubscription?.cancel();
-    _smsSubscription = null;
+    try {
+      await _smsSubscription?.cancel();
+      _smsSubscription = null;
 
-    final result = await stopSmsMonitoring();
+      // Stop background service
+      final backgroundService = di.sl<BackgroundServiceManager>();
+      await backgroundService.stopForegroundService();
 
-    result.fold(
-      (failure) => emit(PendingError(failure.message)),
-      (_) {
-        _smsMonitoringActive = false;
-        emit(SmsMonitoringStopped());
-      },
-    );
+      final result = await stopSmsMonitoring();
+
+      result.fold(
+        (failure) => emit(PendingError(failure.message)),
+        (_) {
+          _smsMonitoringActive = false;
+          emit(SmsMonitoringStopped());
+        },
+      );
+    } catch (e) {
+      emit(PendingError('Failed to stop SMS monitoring: ${e.toString()}'));
+    }
   }
 
   void _startListeningToSmsStream() {
@@ -210,7 +273,39 @@ class PendingBloc extends Bloc<PendingEvent, PendingState> {
     SyncOfflineQueueEvent event,
     Emitter<PendingState> emit,
   ) async {
-    // Implement sync logic here
+    try {
+      // Get queue manager and process queue manually
+      final queueManager = di.sl<QueueManager>();
+      final result = await queueManager.processQueue();
+
+      result.fold(
+        (failure) {
+          // Show temporary error but don't change main state
+          print('Manual sync failed: ${failure.message}');
+        },
+        (_) {
+          print('Manual sync completed successfully');
+          // Update queue count
+          _updateQueueCountFromManager();
+        },
+      );
+    } catch (e) {
+      print('Error in manual sync: $e');
+    }
+  }
+
+  Future<void> _updateQueueCountFromManager() async {
+    try {
+      final queueManager = di.sl<QueueManager>();
+      final countResult = await queueManager.getQueueCount();
+
+      countResult.fold(
+        (failure) => print('Failed to get queue count: ${failure.message}'),
+        (count) => add(UpdateQueueCountEvent(count)),
+      );
+    } catch (e) {
+      print('Error getting queue count: $e');
+    }
   }
 
   Future<void> _onUpdateQueueCount(

@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // Core Services
 import '../core/services/connectivity_service.dart';
 import '../core/services/queue_manager.dart';
+import '../core/services/background_service_manager.dart';
+import '../core/services/advanced_permission_service.dart';
 
 // Data Sources
 import '../data/datasources/payment_remote_datasource.dart';
@@ -43,6 +45,14 @@ Future<void> init() async {
   // Core Services
   sl.registerLazySingleton<ConnectivityService>(
     () => ConnectivityServiceImpl(),
+  );
+
+  sl.registerLazySingleton<AdvancedPermissionService>(
+    () => AdvancedPermissionService.instance,
+  );
+
+  sl.registerLazySingleton<BackgroundServiceManager>(
+    () => BackgroundServiceManager.instance,
   );
 
   // Data sources

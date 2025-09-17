@@ -26,6 +26,11 @@ dependencies:
   permission_handler: ^11.3.1
   another_telephony: ^0.4.1
 
+  # Background Processing & Services
+  workmanager: ^0.5.2
+  flutter_foreground_task: ^8.5.0
+  device_info_plus: ^10.1.0
+
   # Local Database & Storage
   sqflite: ^2.3.3+1
   path: ^1.9.0
