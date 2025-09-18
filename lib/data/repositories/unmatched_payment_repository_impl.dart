@@ -1,28 +1,19 @@
-import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
 import '../../domain/entities/unmatched_payment.dart';
 import '../../domain/repositories/unmatched_payment_repository.dart';
-import '../datasources/unmatched_payment_remote_datasource.dart';
-import '../models/unmatched_payment_model.dart';
+import '../datasources/firebase_unmatched_payment_datasource.dart';
 
 class UnmatchedPaymentRepositoryImpl implements UnmatchedPaymentRepository {
-  final UnmatchedPaymentRemoteDataSource remoteDataSource;
+  final FirebaseUnmatchedPaymentDatasource _datasource;
 
-  UnmatchedPaymentRepositoryImpl({required this.remoteDataSource});
+  UnmatchedPaymentRepositoryImpl(this._datasource);
 
   @override
-  Stream<Either<Failure, List<UnmatchedPayment>>> watchUnmatchedPayments() {
-    return remoteDataSource.watchUnmatchedPayments();
+  Stream<List<UnmatchedPayment>> getUnmatchedPayments() {
+    return _datasource.getUnmatchedPayments();
   }
 
   @override
-  Future<Either<Failure, void>> addUnmatchedPayment(UnmatchedPayment payment) {
-    final model = UnmatchedPaymentModel.fromEntity(payment);
-    return remoteDataSource.addUnmatchedPayment(model);
-  }
-
-  @override
-  Future<Either<Failure, void>> deleteUnmatchedPayment(String paymentId) {
-    return remoteDataSource.deleteUnmatchedPayment(paymentId);
+  Future<void> deleteUnmatchedPayment(String paymentId) {
+    return _datasource.deleteUnmatchedPayment(paymentId);
   }
 }

@@ -1,184 +1,120 @@
-# PaySync - Payment Tracking & SMS Monitoring App
+# Pay Sync - Payment SMS Tracker
 
-PaySync হলো একটি Flutter অ্যাপ যা payment tracking এবং SMS monitoring এর জন্য তৈরি করা হয়েছে। এটি বাংলাদেশের bKash এবং Nagad এর SMS automatically detect করে Firebase এ store করে।
+একটি Flutter অ্যাপ যা payment SMS automatically track করে এবং Firebase এ sync করে।
 
 ## Features
 
-### 🔐 Permission Management
-- অ্যাপ শুরুতে সব required permissions check করে
-- SMS এবং Phone permissions না দিলে main screen access করতে পারবেন না
+### 📱 Main Navigation
+- **Request Page**: Firebase payments collection থেকে সব payment data
+- **Pending Page**: Unmatched payments যেগুলো SMS থেকে এসেছে
+- **History Page**: Success এবং Failed payments আলাদা tab এ
+- **Inbox Page**: SMS monitoring এবং real-time processing
 
-### 📱 Navigation Tabs
+### 🔄 Real-time SMS Processing
+- Automatic SMS monitoring (background এ চলে)
+- ২টি SMS format support:
+  - Format 1: "Money Received. Amount: Tk X.XX Sender: XXXXXXX TxnID: XXXXX"
+  - Format 2: "You have received Tk X.XX from XXXXXXX TrxID XXXXX"
+- Auto-parsing এবং data extraction
+- Local SQLite storage
+- Auto-sync to Firebase when internet available
 
-#### 1. Request Tab
-- Firebase এর `payments` collection থেকে pending status এর payments show করে
-- Date অনুযায়ী সর্ট হয় (latest উপরে)
-- Card এ long press করলে status change করার option আসে:
-  - Make as Success
-  - Make as Failed
-
-#### 2. Pending Tab
-- SMS monitoring status দেখায়
-- `unmatched_payments` collection এর data show করে
-- Real-time SMS monitoring (mock implementation)
-- Bkash ও Nagad এর SMS parse করে automatically data add করে
-
-#### 3. History Tab
-দুইটা sub-tab আছে:
-- **Success**: Successful payments (20টা করে pagination)
-- **Failed**: Failed payments (20টা করে pagination)
-- Long press করে delete করার option
+### 🏗️ Architecture
+- **Clean Architecture** pattern
+- **Repository Pattern** for data layer
+- **BLoC** for state management
+- **Dependency Injection** with GetIt
+- **Background Services** for SMS monitoring
 
 ## Firebase Collections
 
-### payments
+### payments/{paymentId}
 ```json
 {
-  "user_id": "xyz",
-  "package_type": "monthly",
-  "quantity": 3,
   "amount": 300,
+  "created_at": "2025-09-17T18:00:06Z",
+  "method": "bkash",
+  "package_type": "monthly",
+  "phone": "01324002899",
+  "quantity": 3,
+  "status": "success|pending|failed",
   "trx_id": "ABC123",
-  "status": "pending|success|failed",
-  "method": "bkash|nagad",
-  "created_at": "timestamp"
+  "user_id": "user123"
 }
 ```
 
-### unmatched_payments
+### unmatched_payments/{id}
 ```json
 {
-  "sender_number": "0195xxxxxxx",
-  "amount": 735,
-  "trx_id": "CHI8MADSNW",
-  "method": "bkash|nagad",
-  "received_at": "timestamp"
+  "amount": 800,
+  "received_at": "2025-09-17T20:10:11Z",
+  "sender_number": "01521798452",
+  "trx_id": "KHDIAKDH"
 }
 ```
 
-## SMS Parsing
+## Permissions Required
+- SMS read permission
+- SMS receive permission
+- Internet permission
+- Background task permission
 
-### Bkash SMS Format
-```
-You have received Tk 735.00 from 01954880349.Ref wifi. Fee Tk 0.00. Balance Tk 762.57. TrxID CHI8MADSNW at 18/08/2025 23:47
-```
+## Installation
 
-### Nagad SMS Format
-```
-Money Received.
-Amount: Tk 500.00
-Sender: 01737067174
-Ref: N/A
-TxnID: 747FUXJZ
-Balance: Tk 500.78
-30/07/2025 11:54
-```
+1. Clone repository
+2. Run `flutter pub get`
+3. Configure Firebase project
+4. Update `firebase_options.dart` with your Firebase config
+5. Run `flutter run`
 
-## Architecture
+## Usage
 
-Clean Architecture অনুসরণ করা হয়েছে:
+1. **SMS Monitoring**: Inbox page এ background service start করুন
+2. **Real-time Updates**: সব page automatically update হবে
+3. **Offline Support**: Internet না থাকলে locally store হবে, পরে sync হবে
+4. **Background Processing**: App বন্ধ থাকলেও SMS monitor করবে
+
+## Project Structure
 
 ```
 lib/
 ├── core/
-│   ├── constants/     # App constants
-│   ├── errors/        # Error handling
-│   └── utils/         # Utility functions
-├── data/
-│   ├── datasources/   # Firebase & Local data sources
-│   ├── models/        # Data models
-│   └── repositories/  # Repository implementations
-├── domain/
-│   ├── entities/      # Business entities
-│   ├── repositories/  # Repository interfaces
-│   └── usecases/      # Business logic
-├── presentation/
-│   ├── bloc/          # State management (BLoC)
-│   ├── pages/         # UI screens
-│   └── widgets/       # Reusable widgets
-└── injection/         # Dependency injection
+│   ├── constants/       # App constants
+│   ├── database/        # SQLite database
+│   ├── errors/          # Error handling
+│   ├── network/         # Network connectivity
+│   ├── services/        # Background services
+│   └── utils/           # Utility functions
+├── features/
+│   ├── request/         # Payment requests
+│   ├── pending/         # Unmatched payments
+│   ├── history/         # Payment history
+│   └── inbox/           # SMS monitoring
+├── injection/           # Dependency injection
+└── shared/              # Shared widgets/navigation
 ```
 
-## Getting Started
+## Development
 
-### Prerequisites
-- Flutter SDK
-- Firebase project setup
-- Android device (for SMS testing)
+### Adding New Features
+1. Create feature folder in `features/`
+2. Implement clean architecture layers
+3. Add to dependency injection
+4. Update navigation if needed
 
-### Installation
+### Testing
+- Unit tests for business logic
+- Widget tests for UI components
+- Integration tests for full workflows
 
-1. Clone the repository
-```bash
-git clone <repository-url>
-cd pay_sync
-```
+## Dependencies
 
-2. Install dependencies
-```bash
-flutter pub get
-```
+- firebase_core, cloud_firestore
+- flutter_bloc, get_it, injectable
+- another_telephony, permission_handler
+- sqflite, connectivity_plus
+- flutter_foreground_task, workmanager
 
-3. Configure Firebase
-- Add `google-services.json` to `android/app/`
-- Update Firebase configuration in `lib/firebase_options.dart`
+## License
 
-4. Build and run
-```bash
-flutter run
-```
-
-### Firebase Setup
-
-1. Create collections in Firestore:
-   - `payments`
-   - `unmatched_payments`
-
-2. Add some sample data to `payments` collection for testing
-
-## Permissions Required
-
-- `android.permission.RECEIVE_SMS`
-- `android.permission.READ_SMS`
-- `android.permission.READ_PHONE_STATE`
-- `android.permission.INTERNET`
-
-## Technology Stack
-
-- **Framework**: Flutter
-- **State Management**: BLoC/Cubit
-- **Backend**: Firebase Firestore
-- **Architecture**: Clean Architecture
-- **Dependency Injection**: GetIt
-- **Error Handling**: Dartz (Either)
-
-## Future Enhancements
-
-1. **Real SMS Monitoring**: Currently using mock implementation
-2. **Push Notifications**: For new payments
-3. **Analytics Dashboard**: Payment statistics
-4. **Multiple Payment Methods**: Support for more mobile banking services
-5. **Offline Support**: Local database with sync
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes
-4. Test thoroughly
-5. Submit pull request
-
-## Notes
-
-- SMS monitoring currently uses mock implementation
-- Real SMS integration needs proper native Android integration
-- Firebase Security Rules should be configured properly in production
-- App requires proper testing with actual payment SMS
-
-## Support
-
-For any issues or questions, please create an issue in the repository.
-
----
-
-**PaySync** - Making payment tracking simple and automated! 🚀
+MIT License

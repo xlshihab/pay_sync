@@ -1,47 +1,31 @@
-import 'package:equatable/equatable.dart';
-
-class UnmatchedPayment extends Equatable {
+class UnmatchedPayment {
   final String id;
-  final String senderNumber;
   final double amount;
-  final String trxId;
-  final String method;
   final DateTime receivedAt;
+  final String senderNumber;
+  final String trxId;
 
-  const UnmatchedPayment({
+  UnmatchedPayment({
     required this.id,
-    required this.senderNumber,
     required this.amount,
-    required this.trxId,
-    required this.method,
     required this.receivedAt,
+    required this.senderNumber,
+    required this.trxId,
   });
 
   UnmatchedPayment copyWith({
     String? id,
-    String? senderNumber,
     double? amount,
-    String? trxId,
-    String? method,
     DateTime? receivedAt,
+    String? senderNumber,
+    String? trxId,
   }) {
     return UnmatchedPayment(
       id: id ?? this.id,
-      senderNumber: senderNumber ?? this.senderNumber,
       amount: amount ?? this.amount,
-      trxId: trxId ?? this.trxId,
-      method: method ?? this.method,
       receivedAt: receivedAt ?? this.receivedAt,
+      senderNumber: senderNumber ?? this.senderNumber,
+      trxId: trxId ?? this.trxId,
     );
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        senderNumber,
-        amount,
-        trxId,
-        method,
-        receivedAt,
-      ];
 }

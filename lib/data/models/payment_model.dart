@@ -2,57 +2,43 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/payment.dart';
 
 class PaymentModel extends Payment {
-  const PaymentModel({
+  PaymentModel({
     required super.id,
-    required super.userId,
-    required super.packageType,
-    required super.quantity,
     required super.amount,
-    required super.trxId,
-    required super.status,
-    required super.method,
     required super.createdAt,
+    required super.method,
+    required super.packageType,
+    required super.phone,
+    required super.quantity,
+    required super.status,
+    required super.trxId,
   });
 
   factory PaymentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return PaymentModel(
       id: doc.id,
-      userId: data['user_id'] ?? '',
-      packageType: data['package_type'] ?? '',
-      quantity: data['quantity'] ?? 0,
-      amount: (data['amount'] ?? 0).toDouble(),
-      trxId: data['trx_id'] ?? '',
-      status: data['status'] ?? '',
-      method: data['method'] ?? '',
+      amount: (data['amount'] as num).toDouble(),
       createdAt: (data['created_at'] as Timestamp).toDate(),
+      method: data['mathod'] as String, // Note: using 'mathod' as per your Firebase field
+      packageType: data['package_type'] as String,
+      phone: data['phone'] as String,
+      quantity: data['quantity'] as int,
+      status: data['status'] as String,
+      trxId: data['trx_id'] as String,
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
-      'user_id': userId,
-      'package_type': packageType,
-      'quantity': quantity,
       'amount': amount,
-      'trx_id': trxId,
-      'status': status,
-      'method': method,
       'created_at': Timestamp.fromDate(createdAt),
+      'mathod': method,
+      'package_type': packageType,
+      'phone': phone,
+      'quantity': quantity,
+      'status': status,
+      'trx_id': trxId,
     };
-  }
-
-  factory PaymentModel.fromEntity(Payment payment) {
-    return PaymentModel(
-      id: payment.id,
-      userId: payment.userId,
-      packageType: payment.packageType,
-      quantity: payment.quantity,
-      amount: payment.amount,
-      trxId: payment.trxId,
-      status: payment.status,
-      method: payment.method,
-      createdAt: payment.createdAt,
-    );
   }
 }

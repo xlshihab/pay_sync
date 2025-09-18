@@ -2,45 +2,31 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/unmatched_payment.dart';
 
 class UnmatchedPaymentModel extends UnmatchedPayment {
-  const UnmatchedPaymentModel({
+  UnmatchedPaymentModel({
     required super.id,
-    required super.senderNumber,
     required super.amount,
-    required super.trxId,
-    required super.method,
     required super.receivedAt,
+    required super.senderNumber,
+    required super.trxId,
   });
 
   factory UnmatchedPaymentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UnmatchedPaymentModel(
       id: doc.id,
-      senderNumber: data['sender_number'] ?? '',
-      amount: (data['amount'] ?? 0).toDouble(),
-      trxId: data['trx_id'] ?? '',
-      method: data['method'] ?? '',
+      amount: (data['amount'] as num).toDouble(),
       receivedAt: (data['received_at'] as Timestamp).toDate(),
+      senderNumber: data['sender_number'] as String,
+      trxId: data['trx_id'] as String,
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
-      'sender_number': senderNumber,
       'amount': amount,
-      'trx_id': trxId,
-      'method': method,
       'received_at': Timestamp.fromDate(receivedAt),
+      'sender_number': senderNumber,
+      'trx_id': trxId,
     };
-  }
-
-  factory UnmatchedPaymentModel.fromEntity(UnmatchedPayment unmatchedPayment) {
-    return UnmatchedPaymentModel(
-      id: unmatchedPayment.id,
-      senderNumber: unmatchedPayment.senderNumber,
-      amount: unmatchedPayment.amount,
-      trxId: unmatchedPayment.trxId,
-      method: unmatchedPayment.method,
-      receivedAt: unmatchedPayment.receivedAt,
-    );
   }
 }

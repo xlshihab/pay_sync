@@ -1,34 +1,36 @@
-import 'package:dartz/dartz.dart';
-import '../../core/errors/failures.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/payment.dart';
 import '../../domain/repositories/payment_repository.dart';
-import '../datasources/payment_remote_datasource.dart';
+import '../datasources/firebase_payment_datasource.dart';
 
 class PaymentRepositoryImpl implements PaymentRepository {
-  final PaymentRemoteDataSource remoteDataSource;
+  final FirebasePaymentDatasource _datasource;
 
-  PaymentRepositoryImpl({required this.remoteDataSource});
+  PaymentRepositoryImpl(this._datasource);
 
   @override
-  Stream<Either<Failure, List<Payment>>> watchPaymentsByStatus(
-    String status, {
-    int? limit,
-    Payment? startAfter,
-  }) {
-    return remoteDataSource.watchPaymentsByStatus(
-      status,
-      limit: limit,
-      startAfter: startAfter,
-    );
+  Stream<List<Payment>> getPendingPayments() {
+    return _datasource.getPendingPayments();
   }
 
   @override
-  Future<Either<Failure, void>> updatePaymentStatus(String paymentId, String status) {
-    return remoteDataSource.updatePaymentStatus(paymentId, status);
+  Stream<List<Payment>> getSuccessPayments({int limit = 10, Payment? lastDoc}) {
+    // Convert Payment entity to DocumentSnapshot if needed for pagination
+    DocumentSnapshot? lastDocSnapshot;
+    // For now, we'll pass null and implement proper pagination later if needed
+    return _datasource.getSuccessPayments(limit: limit, lastDoc: lastDocSnapshot);
   }
 
   @override
-  Future<Either<Failure, void>> deletePayment(String paymentId) {
-    return remoteDataSource.deletePayment(paymentId);
+  Stream<List<Payment>> getFailedPayments({int limit = 10, Payment? lastDoc}) {
+    // Convert Payment entity to DocumentSnapshot if needed for pagination
+    DocumentSnapshot? lastDocSnapshot;
+    // For now, we'll pass null and implement proper pagination later if needed
+    return _datasource.getFailedPayments(limit: limit, lastDoc: lastDocSnapshot);
+  }
+
+  @override
+  Future<void> updatePaymentStatus(String paymentId, String status) {
+    return _datasource.updatePaymentStatus(paymentId, status);
   }
 }

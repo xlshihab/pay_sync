@@ -21,8 +21,9 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- SMS Receiver for background SMS listening -->
-        <receiver android:name="com.shebagames.another_telephony.sms.IncomingSmsReceiver"
+        <!-- SMS Receiver for another_telephony plugin -->
+        <receiver
+            android:name="io.flutter.plugins.uraniborg.another_telephony.sms.IncomingSmsReceiver"
             android:permission="android.permission.BROADCAST_SMS"
             android:enabled="true"
             android:exported="true">

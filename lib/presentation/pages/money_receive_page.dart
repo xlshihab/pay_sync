@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/payment_providers.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/widgets.dart';
+import '../providers/payment_providers.dart';
+import '../widgets/unmatched_payment_card.dart';
 
-class PendingPage extends ConsumerWidget {
-  const PendingPage({super.key});
+class MoneyReceivePage extends ConsumerWidget {
+  const MoneyReceivePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pendingPaymentsAsync = ref.watch(pendingPaymentsStreamProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final unmatchedPaymentsAsync = ref.watch(unmatchedPaymentsStreamProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pending Payments'),
+        title: const Text('Money Receive'),
         actions: [
           IconButton(
             onPressed: () {
@@ -29,7 +29,7 @@ class PendingPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: pendingPaymentsAsync.when(
+      body: unmatchedPaymentsAsync.when(
         data: (payments) {
           if (payments.isEmpty) {
             return const Center(
@@ -37,13 +37,13 @@ class PendingPage extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.payments_outlined,
+                    Icons.money_off_rounded,
                     size: 64,
                     color: Colors.grey,
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'No pending payments found',
+                    'No unmatched payments found',
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey,
@@ -57,9 +57,8 @@ class PendingPage extends ConsumerWidget {
           return ListView.builder(
             itemCount: payments.length,
             itemBuilder: (context, index) {
-              return PaymentCard(
+              return UnmatchedPaymentCard(
                 payment: payments[index],
-                showActions: true,
               );
             },
           );
@@ -81,7 +80,7 @@ class PendingPage extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.refresh(pendingPaymentsStreamProvider),
+                onPressed: () => ref.refresh(unmatchedPaymentsStreamProvider),
                 child: const Text('Retry'),
               ),
             ],

@@ -1,62 +1,47 @@
-import 'package:equatable/equatable.dart';
-
-class Payment extends Equatable {
+class Payment {
   final String id;
-  final String userId;
-  final String packageType;
-  final int quantity;
   final double amount;
-  final String trxId;
-  final String status;
-  final String method;
   final DateTime createdAt;
+  final String method;
+  final String packageType;
+  final String phone;
+  final int quantity;
+  final String status;
+  final String trxId;
 
-  const Payment({
+  Payment({
     required this.id,
-    required this.userId,
-    required this.packageType,
-    required this.quantity,
     required this.amount,
-    required this.trxId,
-    required this.status,
-    required this.method,
     required this.createdAt,
+    required this.method,
+    required this.packageType,
+    required this.phone,
+    required this.quantity,
+    required this.status,
+    required this.trxId,
   });
 
   Payment copyWith({
     String? id,
-    String? userId,
-    String? packageType,
-    int? quantity,
     double? amount,
-    String? trxId,
-    String? status,
-    String? method,
     DateTime? createdAt,
+    String? method,
+    String? packageType,
+    String? phone,
+    int? quantity,
+    String? status,
+    String? trxId,
   }) {
     return Payment(
       id: id ?? this.id,
-      userId: userId ?? this.userId,
-      packageType: packageType ?? this.packageType,
-      quantity: quantity ?? this.quantity,
       amount: amount ?? this.amount,
-      trxId: trxId ?? this.trxId,
-      status: status ?? this.status,
-      method: method ?? this.method,
       createdAt: createdAt ?? this.createdAt,
+      method: method ?? this.method,
+      packageType: packageType ?? this.packageType,
+      phone: phone ?? this.phone,
+      quantity: quantity ?? this.quantity,
+      status: status ?? this.status,
+      trxId: trxId ?? this.trxId,
     );
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        userId,
-        packageType,
-        quantity,
-        amount,
-        trxId,
-        status,
-        method,
-        createdAt,
-      ];
 }
