@@ -1,18 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:another_telephony/telephony.dart' as telephony;
+import 'package:another_telephony/telephony.dart' as tel;
 import 'package:flutter/material.dart';
-import '../../data/models/sms_message.dart' as models;
+import '../../core/services/sms_deletion_service.dart';
+import '../../data/models/sms_message.dart';
 
 // Telephony instance
-final telephonyProvider = Provider<telephony.Telephony>((ref) => telephony.Telephony.instance);
+final telephonyProvider = Provider<tel.Telephony>((ref) => tel.Telephony.instance);
 
 // SMS messages state
 class SmsState {
-  final List<models.SmsThread> threads;
-  final List<models.SmsMessage> messages;
+  final List<SmsThread> threads;
+  final List<SmsMessage> messages;
   final bool isLoading;
   final String? error;
   final bool hasPermissions;
+  final Set<int> selectedThreadIds;
+  final bool isSelectionMode;
+  final String searchQuery;
 
   SmsState({
     this.threads = const [],
@@ -20,14 +24,20 @@ class SmsState {
     this.isLoading = false,
     this.error,
     this.hasPermissions = false,
+    this.selectedThreadIds = const {},
+    this.isSelectionMode = false,
+    this.searchQuery = '',
   });
 
   SmsState copyWith({
-    List<models.SmsThread>? threads,
-    List<models.SmsMessage>? messages,
+    List<SmsThread>? threads,
+    List<SmsMessage>? messages,
     bool? isLoading,
     String? error,
     bool? hasPermissions,
+    Set<int>? selectedThreadIds,
+    bool? isSelectionMode,
+    String? searchQuery,
   }) {
     return SmsState(
       threads: threads ?? this.threads,
@@ -35,42 +45,48 @@ class SmsState {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       hasPermissions: hasPermissions ?? this.hasPermissions,
+      selectedThreadIds: selectedThreadIds ?? this.selectedThreadIds,
+      isSelectionMode: isSelectionMode ?? this.isSelectionMode,
+      searchQuery: searchQuery ?? this.searchQuery,
     );
+  }
+
+  // Filtered threads based on search query
+  List<SmsThread> get filteredThreads {
+    if (searchQuery.isEmpty) return threads;
+
+    return threads.where((thread) {
+      final query = searchQuery.toLowerCase();
+      return thread.address.toLowerCase().contains(query) ||
+             (thread.contactName?.toLowerCase().contains(query) ?? false) ||
+             thread.lastMessage.body.toLowerCase().contains(query);
+    }).toList();
   }
 }
 
-// SMS Provider
+// SMS Provider - Simplified without permission checking since PermissionGatePage handles it
 class SmsNotifier extends StateNotifier<SmsState> {
-  final telephony.Telephony _telephony;
+  final tel.Telephony _telephony;
 
   SmsNotifier(this._telephony) : super(SmsState()) {
-    _initializeSms();
+    // Don't auto-initialize - wait for explicit call from HomePage
   }
 
-  Future<void> _initializeSms() async {
+  // Initialize SMS functionality (called from HomePage after permissions are granted)
+  Future<void> initializeSms() async {
     state = state.copyWith(isLoading: true);
+    debugPrint('🔄 Initializing SMS functionality...');
 
     try {
-      // Check permissions
-      final hasPermissions = await _checkPermissions();
-      if (!hasPermissions) {
-        state = state.copyWith(
-          isLoading: false,
-          hasPermissions: false,
-          error: 'SMS permissions required',
-        );
-        return;
-      }
-
       // Load SMS threads
       await loadSmsThreads();
 
-      // Listen for incoming SMS without background processing for now
+      // Listen for incoming SMS
       _telephony.listenIncomingSms(
-        onNewMessage: (telephony.SmsMessage message) {
+        onNewMessage: (tel.SmsMessage message) {
           _handleNewSms(message);
         },
-        listenInBackground: false, // Set to false to avoid background handler requirement
+        listenInBackground: false,
       );
 
       state = state.copyWith(
@@ -78,7 +94,11 @@ class SmsNotifier extends StateNotifier<SmsState> {
         hasPermissions: true,
         error: null,
       );
-    } catch (e) {
+      debugPrint('✅ SMS initialization completed successfully!');
+
+    } catch (e, stackTrace) {
+      debugPrint('💥 Error initializing SMS: $e');
+      debugPrint('📍 Stack trace: $stackTrace');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to initialize SMS: $e',
@@ -86,56 +106,75 @@ class SmsNotifier extends StateNotifier<SmsState> {
     }
   }
 
-  Future<bool> _checkPermissions() async {
-    try {
-      final permissions = await _telephony.requestPhoneAndSmsPermissions;
-      return permissions ?? false;
-    } catch (e) {
-      debugPrint('Permission error: $e');
-      return false;
-    }
-  }
-
-  Future<void> requestDefaultSmsApp() async {
-    try {
-      final isDefault = await _telephony.isSmsCapable;
-      if (isDefault != null && !isDefault) {
-        debugPrint('App is not SMS capable or not default SMS app');
-      }
-    } catch (e) {
-      debugPrint('Default SMS app error: $e');
-    }
-  }
-
   Future<void> loadSmsThreads() async {
     try {
       state = state.copyWith(isLoading: true);
+      debugPrint('📥 Loading SMS threads...');
 
       final conversations = await _telephony.getConversations();
-      final threads = <models.SmsThread>[];
+      debugPrint('💬 Found ${conversations.length} conversations');
+
+      final threads = <SmsThread>[];
+
+      // Performance improvement: Get all messages at once
+      final allInboxMessages = await _telephony.getInboxSms(
+        sortOrder: [tel.OrderBy(tel.SmsColumn.DATE, sort: tel.Sort.DESC)],
+      );
+      debugPrint('📥 Found ${allInboxMessages.length} inbox messages');
+
+      final allSentMessages = await _telephony.getSentSms(
+        sortOrder: [tel.OrderBy(tel.SmsColumn.DATE, sort: tel.Sort.DESC)],
+      );
+      debugPrint('📤 Found ${allSentMessages.length} sent messages');
+
+      // Group messages by thread ID
+      final messagesByThread = <int, List<tel.SmsMessage>>{};
+
+      for (final message in [...allInboxMessages, ...allSentMessages]) {
+        final threadId = message.threadId ?? 0;
+        if (threadId > 0) {
+          if (!messagesByThread.containsKey(threadId)) {
+            messagesByThread[threadId] = [];
+          }
+          messagesByThread[threadId]!.add(message);
+        }
+      }
+
+      debugPrint('📊 Grouped messages into ${messagesByThread.length} threads');
 
       for (final conv in conversations) {
-        final messages = await _telephony.getInboxSms(
-          filter: telephony.SmsFilter.where(telephony.SmsColumn.THREAD_ID).equals(conv.threadId.toString()),
-          sortOrder: [telephony.OrderBy(telephony.SmsColumn.DATE, sort: telephony.Sort.DESC)],
-        );
+        final threadId = conv.threadId ?? 0;
+        final threadMessages = messagesByThread[threadId] ?? [];
 
-        if (messages.isNotEmpty) {
-          final lastMessage = _convertToSmsMessage(messages.first);
-          final unreadCount = messages.where((m) => m.read == false).length;
+        if (threadMessages.isNotEmpty) {
+          // Sort messages by date to get the latest one
+          threadMessages.sort((a, b) {
+            final aDate = a.date ?? 0;
+            final bDate = b.date ?? 0;
+            return bDate.compareTo(aDate);
+          });
 
-          threads.add(models.SmsThread(
-            threadId: conv.threadId ?? 0,
-            address: conv.snippet ?? '',
+          final lastMessage = _convertToSmsMessage(threadMessages.first);
+          final unreadCount = threadMessages.where((m) => m.read == false).length;
+
+          // Get proper address from the last message instead of conversation snippet
+          final address = lastMessage.address.isNotEmpty ? lastMessage.address : (conv.snippet ?? '');
+
+          threads.add(SmsThread(
+            threadId: threadId,
+            address: address,
             contactName: null,
             lastMessage: lastMessage,
-            messageCount: conv.messageCount ?? 0,
+            messageCount: conv.messageCount ?? threadMessages.length,
             unreadCount: unreadCount,
           ));
+
+          debugPrint('✅ Created thread: $address (${threadMessages.length} messages)');
         }
       }
 
       threads.sort((a, b) => b.lastMessage.date.compareTo(a.lastMessage.date));
+      debugPrint('🎯 Final result: ${threads.length} threads created');
 
       state = state.copyWith(
         threads: threads,
@@ -143,6 +182,7 @@ class SmsNotifier extends StateNotifier<SmsState> {
         error: null,
       );
     } catch (e) {
+      debugPrint('💥 Error loading SMS threads: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to load SMS threads: $e',
@@ -153,23 +193,21 @@ class SmsNotifier extends StateNotifier<SmsState> {
   Future<void> loadMessagesForThread(int threadId) async {
     try {
       final messages = await _telephony.getInboxSms(
-        filter: telephony.SmsFilter.where(telephony.SmsColumn.THREAD_ID).equals(threadId.toString()),
-        sortOrder: [telephony.OrderBy(telephony.SmsColumn.DATE, sort: telephony.Sort.ASC)],
+        filter: tel.SmsFilter.where(tel.SmsColumn.THREAD_ID).equals(threadId.toString()),
+        sortOrder: [tel.OrderBy(tel.SmsColumn.DATE, sort: tel.Sort.ASC)],
       );
 
       final sentMessages = await _telephony.getSentSms(
-        filter: telephony.SmsFilter.where(telephony.SmsColumn.THREAD_ID).equals(threadId.toString()),
-        sortOrder: [telephony.OrderBy(telephony.SmsColumn.DATE, sort: telephony.Sort.ASC)],
+        filter: tel.SmsFilter.where(tel.SmsColumn.THREAD_ID).equals(threadId.toString()),
+        sortOrder: [tel.OrderBy(tel.SmsColumn.DATE, sort: tel.Sort.ASC)],
       );
 
       final allMessages = [...messages, ...sentMessages];
 
-      // Sort by date safely - handle both int and DateTime types
       allMessages.sort((a, b) {
         try {
           DateTime aDate, bDate;
 
-          // Convert a.date
           if (a.date == null) {
             aDate = DateTime.fromMillisecondsSinceEpoch(0);
           } else if (a.date is int) {
@@ -180,7 +218,6 @@ class SmsNotifier extends StateNotifier<SmsState> {
             aDate = DateTime.now();
           }
 
-          // Convert b.date
           if (b.date == null) {
             bDate = DateTime.fromMillisecondsSinceEpoch(0);
           } else if (b.date is int) {
@@ -193,7 +230,7 @@ class SmsNotifier extends StateNotifier<SmsState> {
 
           return aDate.compareTo(bDate);
         } catch (e) {
-          return 0; // If any error, consider them equal
+          return 0;
         }
       });
 
@@ -205,41 +242,89 @@ class SmsNotifier extends StateNotifier<SmsState> {
     }
   }
 
-  Future<void> sendSms(String address, String message) async {
-    try {
-      await _telephony.sendSms(
-        to: address,
-        message: message,
-      );
-
-      await loadSmsThreads();
-    } catch (e) {
-      state = state.copyWith(error: 'Failed to send SMS: $e');
-    }
+  // Search functionality
+  void updateSearchQuery(String query) {
+    state = state.copyWith(searchQuery: query);
   }
 
+  void clearSearch() {
+    state = state.copyWith(searchQuery: '');
+  }
+
+  // Mark as read/unread functionality
   Future<void> markAsRead(int messageId) async {
     try {
+      debugPrint('Marking message $messageId as read');
       await loadSmsThreads();
     } catch (e) {
       state = state.copyWith(error: 'Failed to mark as read: $e');
     }
   }
 
+  Future<void> markAsUnread(int messageId) async {
+    try {
+      debugPrint('Marking message $messageId as unread');
+      await loadSmsThreads();
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to mark as unread: $e');
+    }
+  }
+
+  Future<void> markThreadAsRead(int threadId) async {
+    try {
+      final threadMessages = state.messages.where((msg) => msg.threadId == threadId);
+      for (final message in threadMessages) {
+        await markAsRead(message.id);
+      }
+      await loadSmsThreads();
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to mark thread as read: $e');
+    }
+  }
+
+  // Delete functionality
   Future<void> deleteSms(int messageId) async {
     try {
-      await loadSmsThreads();
+      final deleted = await SmsDeletionService.deleteSms(messageId);
+      if (deleted) {
+        await loadSmsThreads();
+      } else {
+        state = state.copyWith(error: 'Failed to delete message');
+      }
     } catch (e) {
       state = state.copyWith(error: 'Failed to delete SMS: $e');
     }
   }
 
-  void _handleNewSms(telephony.SmsMessage sms) {
+  Future<void> deleteConversation(int threadId) async {
+    try {
+      final deleted = await SmsDeletionService.deleteConversation(threadId);
+      if (deleted) {
+        await loadSmsThreads();
+      } else {
+        state = state.copyWith(error: 'Failed to delete conversation');
+      }
+    } catch (e) {
+      state = state.copyWith(error: 'Failed to delete conversation: $e');
+    }
+  }
+
+  void _handleNewSms(tel.SmsMessage sms) {
+    _showSmsNotification(sms);
     loadSmsThreads();
   }
 
-  models.SmsMessage _convertToSmsMessage(telephony.SmsMessage sms) {
-    // Handle date conversion properly - it comes as int milliseconds
+  void _showSmsNotification(tel.SmsMessage sms) {
+    try {
+      final sender = sms.address ?? 'Unknown';
+      final body = sms.body ?? '';
+      debugPrint('New SMS from $sender: $body');
+    } catch (e) {
+      debugPrint('Failed to show SMS notification: $e');
+    }
+  }
+
+  SmsMessage _convertToSmsMessage(tel.SmsMessage sms) {
     DateTime messageDate;
     try {
       if (sms.date != null) {
@@ -257,15 +342,89 @@ class SmsNotifier extends StateNotifier<SmsState> {
       messageDate = DateTime.now();
     }
 
-    return models.SmsMessage(
+    bool isSent = false;
+    if (sms.type != null) {
+      if (sms.type.toString().contains('2') || sms.type.toString().contains('SENT')) {
+        isSent = true;
+      }
+    }
+
+    return SmsMessage(
       id: sms.id ?? 0,
       address: sms.address ?? '',
       body: sms.body ?? '',
       date: messageDate,
       isRead: sms.read ?? false,
-      isSent: sms.type == 2, // 2 = SENT, 1 = RECEIVED
+      isSent: isSent,
       threadId: sms.threadId ?? 0,
     );
+  }
+
+  // Selection mode methods
+  void startSelectionMode(int threadId) {
+    state = state.copyWith(
+      isSelectionMode: true,
+      selectedThreadIds: {threadId},
+    );
+  }
+
+  void exitSelectionMode() {
+    state = state.copyWith(
+      isSelectionMode: false,
+      selectedThreadIds: <int>{},
+    );
+  }
+
+  void toggleSelection(int threadId) {
+    final selectedIds = Set<int>.from(state.selectedThreadIds);
+    if (selectedIds.contains(threadId)) {
+      selectedIds.remove(threadId);
+    } else {
+      selectedIds.add(threadId);
+    }
+
+    state = state.copyWith(
+      selectedThreadIds: selectedIds,
+      isSelectionMode: selectedIds.isNotEmpty,
+    );
+  }
+
+  void selectAllThreads() {
+    final allThreadIds = state.filteredThreads.map((thread) => thread.threadId).toSet();
+    state = state.copyWith(
+      selectedThreadIds: allThreadIds,
+      isSelectionMode: true,
+    );
+  }
+
+  void clearSelection() {
+    state = state.copyWith(
+      selectedThreadIds: <int>{},
+      isSelectionMode: false,
+    );
+  }
+
+  Future<void> deleteSelectedThreads() async {
+    try {
+      state = state.copyWith(isLoading: true);
+
+      for (final threadId in state.selectedThreadIds) {
+        await deleteConversation(threadId);
+      }
+
+      await loadSmsThreads();
+
+      state = state.copyWith(
+        isSelectionMode: false,
+        selectedThreadIds: <int>{},
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        error: 'Failed to delete conversations: $e',
+        isLoading: false,
+      );
+    }
   }
 }
 

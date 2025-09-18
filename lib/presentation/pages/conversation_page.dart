@@ -14,7 +14,6 @@ class ConversationPage extends ConsumerStatefulWidget {
 }
 
 class _ConversationPageState extends ConsumerState<ConversationPage> {
-  final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -22,12 +21,25 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(smsProvider.notifier).loadMessagesForThread(widget.thread.threadId);
+      // Auto scroll to bottom after loading messages
+      _scrollToBottom();
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
   @override
   void dispose() {
-    _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -59,75 +71,77 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         actions: [
-          IconButton(
-            onPressed: () {
-              // Call functionality
-            },
-            icon: const Icon(Icons.call),
-            tooltip: 'Call',
-          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
                 case 'info':
                   // Show contact info
+                  _showContactInfo();
+                  break;
+                case 'mark_read':
+                  // Mark conversation as read
+                  ref.read(smsProvider.notifier).markThreadAsRead(widget.thread.threadId);
+                  break;
+                case 'mark_unread':
+                  // Mark conversation as unread (mark individual messages as unread)
+                  final messages = smsState.messages.where((msg) => msg.threadId == widget.thread.threadId);
+                  for (final message in messages) {
+                    ref.read(smsProvider.notifier).markAsUnread(message.id);
+                  }
                   break;
                 case 'delete':
                   // Delete conversation
-                  break;
-                case 'block':
-                  // Block contact
+                  _showDeleteConfirmation();
                   break;
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'info',
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline),
-                    SizedBox(width: 8),
-                    Text('Contact info'),
-                  ],
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('Contact info'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'mark_read',
+                child: ListTile(
+                  leading: Icon(Icons.mark_email_read),
+                  title: Text('Mark as read'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'mark_unread',
+                child: ListTile(
+                  leading: Icon(Icons.mark_email_unread),
+                  title: Text('Mark as unread'),
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
               const PopupMenuItem(
                 value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline),
-                    SizedBox(width: 8),
-                    Text('Delete conversation'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'block',
-                child: Row(
-                  children: [
-                    Icon(Icons.block),
-                    SizedBox(width: 8),
-                    Text('Block contact'),
-                  ],
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Delete conversation'),
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
             ],
+            icon: const Icon(Icons.more_vert_rounded),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _buildMessagesList(smsState.messages),
-          ),
-          _buildMessageInput(theme),
-        ],
-      ),
+      body: _buildMessagesList(smsState.messages),
+      // Removed message input - read-only conversation view
     );
   }
 
   Widget _buildMessagesList(List<SmsMessage> messages) {
-    if (messages.isEmpty) {
+    final conversationMessages = messages.where((msg) => msg.threadId == widget.thread.threadId).toList();
+
+    if (conversationMessages.isEmpty) {
       return const Center(
         child: Text(
           'No messages in this conversation',
@@ -139,17 +153,20 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: messages.length,
+      itemCount: conversationMessages.length,
       itemBuilder: (context, index) {
-        final message = messages[index];
-        final isLastMessage = index == messages.length - 1;
-        final nextMessage = isLastMessage ? null : messages[index + 1];
+        final message = conversationMessages[index];
+        final isLastMessage = index == conversationMessages.length - 1;
+        final nextMessage = isLastMessage ? null : conversationMessages[index + 1];
         final showDateHeader = _shouldShowDateHeader(message, nextMessage);
 
         return Column(
           children: [
             if (showDateHeader) _buildDateHeader(message.date),
-            _buildMessageBubble(message),
+            GestureDetector(
+              onLongPress: () => _showMessageOptions(message),
+              child: _buildMessageBubble(message),
+            ),
             const SizedBox(height: 4),
           ],
         );
@@ -205,60 +222,29 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              DateFormat('h:mm a').format(message.date),
-              style: TextStyle(
-                fontSize: 11,
-                color: isOutgoing
-                    ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-          ),
-        ),
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('h:mm a').format(message.date),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isOutgoing
+                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-            ),
-            const SizedBox(width: 8),
-            FloatingActionButton(
-              onPressed: _sendMessage,
-              mini: true,
-              child: const Icon(Icons.send),
+                if (!message.isRead) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.circle,
+                    size: 6,
+                    color: isOutgoing
+                        ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
+                        : theme.colorScheme.primary,
+                  ),
+                ],
+              ],
             ),
           ],
         ),
@@ -266,22 +252,78 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     );
   }
 
-  void _sendMessage() {
-    final message = _messageController.text.trim();
-    if (message.isNotEmpty) {
-      ref.read(smsProvider.notifier).sendSms(widget.thread.address, message);
-      _messageController.clear();
+  void _showMessageOptions(SmsMessage message) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(message.isRead ? Icons.mark_email_unread : Icons.mark_email_read),
+              title: Text(message.isRead ? 'Mark as unread' : 'Mark as read'),
+              onTap: () {
+                Navigator.pop(context);
+                if (message.isRead) {
+                  ref.read(smsProvider.notifier).markAsUnread(message.id);
+                } else {
+                  ref.read(smsProvider.notifier).markAsRead(message.id);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Copy message'),
+              onTap: () {
+                Navigator.pop(context);
+                // Copy to clipboard functionality would go here
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Message copied to clipboard')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete message', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteMessageConfirmation(message);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
+  void _showDeleteMessageConfirmation(SmsMessage message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete message'),
+        content: const Text('Are you sure you want to delete this message?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              ref.read(smsProvider.notifier).deleteSms(message.id);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Message deleted')),
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _shouldShowDateHeader(SmsMessage current, SmsMessage? next) {
@@ -321,5 +363,80 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     }
 
     return phoneNumber;
+  }
+
+  void _showContactInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Contact Info'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.phone),
+              title: const Text('Phone Number'),
+              subtitle: Text(_formatPhoneNumber(widget.thread.address)),
+              contentPadding: EdgeInsets.zero,
+            ),
+            ListTile(
+              leading: const Icon(Icons.message),
+              title: const Text('Messages'),
+              subtitle: Text('${widget.thread.messageCount} messages'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (widget.thread.unreadCount > 0)
+              ListTile(
+                leading: const Icon(Icons.mark_email_unread),
+                title: const Text('Unread'),
+                subtitle: Text('${widget.thread.unreadCount} unread messages'),
+                contentPadding: EdgeInsets.zero,
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete conversation'),
+        content: const Text('Are you sure you want to delete this entire conversation? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Delete conversation functionality
+              ref.read(smsProvider.notifier).deleteConversation(widget.thread.threadId);
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Go back to inbox
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Conversation deleted'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 }

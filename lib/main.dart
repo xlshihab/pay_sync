@@ -4,9 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'presentation/pages/home_page.dart';
 import 'presentation/pages/conversation_page.dart';
-import 'presentation/pages/compose_message_page.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'data/models/sms_message.dart';
+import 'core/pages/permission_gate_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,12 +55,14 @@ class PaySyncApp extends ConsumerWidget {
           elevation: 0,
         ),
       ),
-      home: const HomePage(),
-      routes: {
-        '/compose': (context) => const ComposeMessagePage(),
-      },
+      // Start with Permission Gate instead of Home
+      home: const PermissionGatePage(),
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/home':
+            return MaterialPageRoute(
+              builder: (context) => const HomePage(),
+            );
           case '/conversation':
             final thread = settings.arguments as SmsThread;
             return MaterialPageRoute(

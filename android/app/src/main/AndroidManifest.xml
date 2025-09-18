@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" />
+    <uses-permission android:name="android.permission.SEND_RESPOND_VIA_MESSAGE" />
 
     <!-- Internet & Network -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -33,14 +34,19 @@
             android:excludeFromRecents="false">
 
             <!-- Normal App Launcher -->
-            <intent-filter android:priority="0">
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Default SMS App Intent Filters -->
-            <intent-filter android:priority="1000">
+            <!-- CRITICAL: SMS App Intent Filters - Required for Default SMS App -->
+            <intent-filter>
                 <action android:name="android.intent.action.SEND" />
+                <data android:mimeType="text/plain" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <intent-filter>
                 <action android:name="android.intent.action.SENDTO" />
                 <data android:scheme="sms" />
                 <data android:scheme="smsto" />
@@ -50,39 +56,90 @@
                 <category android:name="android.intent.category.BROWSABLE" />
             </intent-filter>
 
-            <!-- SMS Compose -->
-            <intent-filter android:priority="1000">
+            <!-- CRITICAL: SMS Delivery Intent Filter - MANDATORY -->
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
+            </intent-filter>
+
+            <!-- CRITICAL: WAP Push Delivery Intent Filter - MANDATORY -->
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+
+            <!-- View SMS Intent Filter -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SENDTO" />
                 <data android:scheme="sms" />
                 <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
             </intent-filter>
         </activity>
 
-        <!-- SMS Receiver -->
-        <receiver
-            android:name="io.flutter.plugins.uraniborg.another_telephony.sms.IncomingSmsReceiver"
-            android:permission="android.permission.BROADCAST_SMS"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="1000">
+        <!-- CRITICAL: SMS Receiver - MANDATORY for Default SMS App -->
+        <receiver android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
             </intent-filter>
         </receiver>
 
-        <!-- MMS Receiver -->
-        <receiver
-            android:name="io.flutter.plugins.uraniborg.another_telephony.sms.MmsReceiver"
-            android:permission="android.permission.BROADCAST_WAP_PUSH"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="1000">
+        <!-- CRITICAL: MMS Receiver - MANDATORY for Default SMS App -->
+        <receiver android:name=".MmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.MMS_RECEIVED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_RECEIVED" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <!-- WAP Push Receiver - MANDATORY for Default SMS App -->
+        <receiver android:name=".WapPushReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+            <intent-filter>
                 <action android:name="android.provider.Telephony.WAP_PUSH_RECEIVED" />
                 <data android:mimeType="application/vnd.wap.mms-message" />
             </intent-filter>
         </receiver>
+
+        <!-- CRITICAL: HeadlessIncomingSmsService - MANDATORY for Default SMS App -->
+        <service android:name=".HeadlessIncomingSmsService"
+            android:exported="true"
+            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+        </service>
+
+        <!-- CRITICAL: MmsService - MANDATORY for Default SMS App -->
+        <service android:name=".MmsService"
+            android:exported="true">
+        </service>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -91,11 +148,17 @@
             android:value="2" />
     </application>
 
-    <!-- Query SMS packages -->
+    <!-- Queries element for newer Android versions -->
     <queries>
         <intent>
-            <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        <intent>
+            <action android:name="android.provider.Telephony.SMS_DELIVER" />
+        </intent>
+        <intent>
+            <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
         </intent>
     </queries>
 </manifest>
-

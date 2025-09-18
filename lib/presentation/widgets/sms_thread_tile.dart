@@ -6,12 +6,16 @@ class SmsThreadTile extends StatelessWidget {
   final SmsThread thread;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final bool isSelected;
+  final bool isSelectionMode;
 
   const SmsThreadTile({
     super.key,
     required this.thread,
     required this.onTap,
     this.onLongPress,
+    this.isSelected = false,
+    this.isSelectionMode = false,
   });
 
   @override
@@ -24,22 +28,41 @@ class SmsThreadTile extends StatelessWidget {
       onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+              : null,
+        ),
         child: Row(
           children: [
-            // Contact Avatar
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-              child: Text(
-                _getContactInitial(),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
+            // Selection indicator or Contact Avatar
+            if (isSelectionMode)
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                child: Icon(
+                  isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  size: 24,
+                ),
+              )
+            else
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  child: Text(
+                    _getContactInitial(),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
 
             // Message Content
             Expanded(
@@ -96,7 +119,7 @@ class SmsThreadTile extends StatelessWidget {
                       ),
 
                       // Unread Count Badge
-                      if (isUnread) ...[
+                      if (isUnread && !isSelectionMode) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

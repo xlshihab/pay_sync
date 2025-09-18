@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/sms_provider.dart';
 import 'pending_page.dart';
 import 'money_receive_page.dart';
 import 'history_page.dart';
 import 'inbox_page.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
+class _HomePageState extends ConsumerState<HomePage> {
+  int _currentIndex = 3; // Start with Inbox tab since we're an SMS app
+  bool _smsInitialized = false;
 
   final List<Widget> _pages = [
     const PendingPage(),
@@ -20,6 +23,26 @@ class _HomePageState extends State<HomePage> {
     const HistoryPage(),
     const InboxPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize SMS functionality after permissions are granted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeSmsIfNeeded();
+    });
+  }
+
+  Future<void> _initializeSmsIfNeeded() async {
+    if (!_smsInitialized) {
+      debugPrint('🏠 HomePage: Initializing SMS functionality...');
+      await ref.read(smsProvider.notifier).initializeSms();
+      setState(() {
+        _smsInitialized = true;
+      });
+      debugPrint('🏠 HomePage: SMS functionality initialized');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +56,7 @@ class _HomePageState extends State<HomePage> {
           });
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(
@@ -49,8 +72,8 @@ class _HomePageState extends State<HomePage> {
             label: 'History',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.inbox),
-            label: 'Inbox',
+            icon: Icon(Icons.message),
+            label: 'Messages',
           ),
         ],
       ),
