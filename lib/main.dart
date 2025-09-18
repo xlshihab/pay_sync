@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'presentation/pages/home_page.dart';
+import 'presentation/pages/conversation_page.dart';
+import 'presentation/pages/compose_message_page.dart';
 import 'presentation/providers/theme_provider.dart';
+import 'data/models/sms_message.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +40,8 @@ class PaySyncApp extends ConsumerWidget {
         ),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 2,
+          centerTitle: false,
+          elevation: 0,
         ),
       ),
       darkTheme: ThemeData(
@@ -48,12 +51,25 @@ class PaySyncApp extends ConsumerWidget {
         ),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 2,
+          centerTitle: false,
+          elevation: 0,
         ),
       ),
       home: const HomePage(),
-      debugShowCheckedModeBanner: false,
+      routes: {
+        '/compose': (context) => const ComposeMessagePage(),
+      },
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/conversation':
+            final thread = settings.arguments as SmsThread;
+            return MaterialPageRoute(
+              builder: (context) => ConversationPage(thread: thread),
+            );
+          default:
+            return null;
+        }
+      },
     );
   }
 }
