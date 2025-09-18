@@ -35,12 +35,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _initializeSmsIfNeeded() async {
     if (!_smsInitialized) {
-      debugPrint('🏠 HomePage: Initializing SMS functionality...');
       await ref.read(smsProvider.notifier).initializeSms();
       setState(() {
         _smsInitialized = true;
       });
-      debugPrint('🏠 HomePage: SMS functionality initialized');
     }
   }
 

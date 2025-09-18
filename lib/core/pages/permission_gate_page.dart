@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/permission_service.dart';
 import '../../presentation/pages/home_page.dart';
+import 'dart:async';
 
 class PermissionGatePage extends ConsumerStatefulWidget {
   const PermissionGatePage({super.key});
@@ -14,17 +15,31 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
   bool _isLoading = true;
   PermissionStatus _currentStatus = PermissionStatus.smsPermissionDenied;
   bool _showRetryButton = false;
+  StreamSubscription? _defaultSmsSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Initialize the permission service to listen for native events
+    PermissionService.initialize();
+
+    // Listen for changes in default SMS app status
+    _defaultSmsSubscription = PermissionService.defaultSmsAppStatus.listen((isDefault) {
+      if (isDefault) {
+        // If we become the default SMS app, immediately check permissions and navigate
+        _checkPermissions();
+      }
+    });
+
     _checkPermissions();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _defaultSmsSubscription?.cancel();
     super.dispose();
   }
 
@@ -34,8 +49,8 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      // Small delay to ensure user has finished with settings
-      Future.delayed(const Duration(milliseconds: 500), () {
+      // Increased delay to ensure system has time to update default app status
+      Future.delayed(const Duration(milliseconds: 1000), () {
         if (mounted) {
           _checkPermissions();
         }
@@ -59,11 +74,13 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
       _isLoading = false;
     });
 
-    // If all permissions granted, navigate to main app
-    if (status == PermissionStatus.allGranted) {
-      await Future.delayed(const Duration(milliseconds: 500));
+    // If all permissions granted or SMS granted but not default, navigate to main app
+    if (status == PermissionStatus.allGranted || status == PermissionStatus.smsGrantedButNotDefault) {
+      // Slightly longer delay to ensure everything is ready
+      await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) {
-        Navigator.of(context).pushReplacement(
+        // Force navigation with explicit root navigator to ensure it works
+        Navigator.of(context, rootNavigator: true).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomePage()),
         );
       }
@@ -91,7 +108,7 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
 
     await PermissionService.requestDefaultSmsApp();
 
-    // Don't immediately recheck - wait for app to resume
+    // Don't immediately recheck - wait for app to resume or for native callback
     setState(() {
       _isLoading = false;
     });
@@ -100,10 +117,19 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select PaySync from the list and return to the app'),
+          content: Text('Please select PaySync app and return to the app'),
           duration: Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
         ),
+      );
+    }
+  }
+
+  Future<void> _skipDefaultSmsAppSetting() async {
+    // Navigate to the HomePage without setting as default SMS app
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomePage()),
       );
     }
   }
@@ -165,11 +191,20 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
               else
                 _buildActionButton(),
 
+              // Skip button for Default SMS app setting
+              if (_currentStatus == PermissionStatus.notDefaultApp && !_isLoading) ...[
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _skipDefaultSmsAppSetting,
+                  child: const Text('Skip (Continue without setting as default)'),
+                ),
+              ],
+
               if (_showRetryButton) ...[
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: _checkPermissions,
-                  child: const Text(' Retry'),
+                  child: const Text('Check Again'),
                 ),
               ],
             ],
@@ -194,14 +229,15 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
         break;
       case PermissionStatus.notDefaultApp:
         icon = Icons.home;
-        title = 'Set as Default SMS App';
-        description = 'Please set PaySync as your default SMS app to continue.';
+        title = 'Set as Default SMS App (Optional)';
+        description = 'For best experience, set PaySync as your default SMS app, or skip to continue with limited functionality.';
         iconColor = Theme.of(context).colorScheme.primary;
         break;
+      case PermissionStatus.smsGrantedButNotDefault:
       case PermissionStatus.allGranted:
         icon = Icons.check_circle;
         title = 'All Set!';
-        description = 'All permissions granted. Loading your messages...';
+        description = 'Permissions granted. Loading your messages...';
         iconColor = Colors.green;
         break;
     }
@@ -251,6 +287,7 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
         buttonText = 'Set as Default SMS App';
         onPressed = _requestDefaultSmsApp;
         break;
+      case PermissionStatus.smsGrantedButNotDefault:
       case PermissionStatus.allGranted:
         buttonText = 'Loading...';
         onPressed = null;

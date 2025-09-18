@@ -111,7 +111,14 @@ class MainActivity: FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        // No logging needed
+
+        if (requestCode == DEFAULT_SMS_REQUEST_CODE) {
+            // When returning from default SMS app request, immediately notify Flutter
+            // This is critical for navigation to work properly
+            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                MethodChannel(messenger, CHANNEL).invokeMethod("defaultSmsAppResult", isDefaultSmsApp())
+            }
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
