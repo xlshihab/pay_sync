@@ -15,7 +15,6 @@ class PermissionService {
       final result = await _channel.invokeMethod('checkSmsPermissions');
       return result as bool? ?? false;
     } catch (e) {
-      print('Error checking SMS permissions: $e');
       return false;
     }
   }
@@ -26,7 +25,6 @@ class PermissionService {
       final result = await _channel.invokeMethod('requestSmsPermissions');
       return result as bool? ?? false;
     } catch (e) {
-      print('Error requesting SMS permissions: $e');
       return false;
     }
   }
@@ -37,7 +35,6 @@ class PermissionService {
       final result = await _channel.invokeMethod('isDefaultSmsApp');
       return result as bool? ?? false;
     } catch (e) {
-      print('Error checking default SMS app: $e');
       return false;
     }
   }
@@ -48,18 +45,6 @@ class PermissionService {
       final result = await _channel.invokeMethod('requestDefaultSmsApp');
       return result as bool? ?? false;
     } catch (e) {
-      print('Error requesting default SMS app: $e');
-      return false;
-    }
-  }
-
-  // Diagnose SMS app issues
-  static Future<bool> diagnoseSmsApp() async {
-    try {
-      final result = await _channel.invokeMethod('diagnoseSmsApp');
-      return result as bool? ?? false;
-    } catch (e) {
-      print('Error diagnosing SMS app: $e');
       return false;
     }
   }

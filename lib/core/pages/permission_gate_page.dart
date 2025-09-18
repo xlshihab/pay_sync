@@ -34,7 +34,6 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      debugPrint('🔄 App resumed - rechecking permissions...');
       // Small delay to ensure user has finished with settings
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
@@ -54,7 +53,6 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
     await Future.delayed(const Duration(milliseconds: 500));
 
     final status = await PermissionService.checkAllPermissions();
-    debugPrint('🔍 Permission check result: $status');
 
     setState(() {
       _currentStatus = status;
@@ -63,8 +61,7 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
 
     // If all permissions granted, navigate to main app
     if (status == PermissionStatus.allGranted) {
-      debugPrint('✅ All permissions granted - navigating to HomePage');
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomePage()),
@@ -78,12 +75,10 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
       _isLoading = true;
     });
 
-    debugPrint('📋 Requesting SMS permissions...');
-    final granted = await PermissionService.requestSmsPermissions();
-    debugPrint('📋 SMS permissions request result: $granted');
+    await PermissionService.requestSmsPermissions();
 
     // Wait a bit for permission dialog to close
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 1000));
 
     // Always recheck permissions regardless of the returned value
     await _checkPermissions();
@@ -94,7 +89,6 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
       _isLoading = true;
     });
 
-    debugPrint('🏠 Requesting default SMS app status...');
     await PermissionService.requestDefaultSmsApp();
 
     // Don't immediately recheck - wait for app to resume
@@ -175,25 +169,7 @@ class _PermissionGatePageState extends ConsumerState<PermissionGatePage> with Wi
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: _checkPermissions,
-                  child: const Text('Check Again'),
-                ),
-              ],
-
-              // NEW: Diagnose button for debugging
-              if (_currentStatus == PermissionStatus.notDefaultApp) ...[
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: () async {
-                    debugPrint('🔍 Running SMS app diagnosis...');
-                    await PermissionService.diagnoseSmsApp();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Check logcat for detailed diagnosis results'),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  },
-                  child: const Text('Diagnose Issue'),
+                  child: const Text(' Retry'),
                 ),
               ],
             ],
