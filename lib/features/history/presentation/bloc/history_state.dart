@@ -19,6 +19,8 @@ class HistoryLoaded extends HistoryState {
   final bool isLoadingMoreFailed;
   final bool hasMoreSuccess;
   final bool hasMoreFailed;
+  final int successPage;
+  final int failedPage;
 
   const HistoryLoaded({
     required this.successPayments,
@@ -27,6 +29,8 @@ class HistoryLoaded extends HistoryState {
     this.isLoadingMoreFailed = false,
     this.hasMoreSuccess = true,
     this.hasMoreFailed = true,
+    this.successPage = 0,
+    this.failedPage = 0,
   });
 
   HistoryLoaded copyWith({
@@ -36,6 +40,8 @@ class HistoryLoaded extends HistoryState {
     bool? isLoadingMoreFailed,
     bool? hasMoreSuccess,
     bool? hasMoreFailed,
+    int? successPage,
+    int? failedPage,
   }) {
     return HistoryLoaded(
       successPayments: successPayments ?? this.successPayments,
@@ -44,6 +50,8 @@ class HistoryLoaded extends HistoryState {
       isLoadingMoreFailed: isLoadingMoreFailed ?? this.isLoadingMoreFailed,
       hasMoreSuccess: hasMoreSuccess ?? this.hasMoreSuccess,
       hasMoreFailed: hasMoreFailed ?? this.hasMoreFailed,
+      successPage: successPage ?? this.successPage,
+      failedPage: failedPage ?? this.failedPage,
     );
   }
 
@@ -55,6 +63,8 @@ class HistoryLoaded extends HistoryState {
         isLoadingMoreFailed,
         hasMoreSuccess,
         hasMoreFailed,
+        successPage,
+        failedPage,
       ];
 }
 

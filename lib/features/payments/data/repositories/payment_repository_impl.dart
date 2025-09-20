@@ -10,18 +10,19 @@ class PaymentRepositoryImpl implements PaymentRepository {
   PaymentRepositoryImpl(this._firestore);
 
   @override
-  Stream<List<Payment>> getPaymentsByStatus(PaymentStatus status, {int limit = 10}) {
-    print('🔍 PaymentRepository: Querying payments with status: ${status.name}');
+  Stream<List<Payment>> getPaymentsByStatus(PaymentStatus status, {int limit = 10, int offset = 0}) {
+    print('🔍 PaymentRepository: Querying payments with status: ${status.name}, limit: $limit, offset: $offset');
 
     return _firestore
         .collection(_collection)
         .where('status', isEqualTo: status.name)
         .orderBy('created_at', descending: true)
-        .limit(limit)
+        .limit(limit + offset) // Get more data to skip
         .snapshots()
         .map((snapshot) {
           print('📄 PaymentRepository: Received ${snapshot.docs.length} documents for status ${status.name}');
-          final payments = snapshot.docs
+
+          final allPayments = snapshot.docs
               .map((doc) {
                 try {
                   return PaymentModel.fromFirestore(doc).toEntity();
@@ -33,7 +34,13 @@ class PaymentRepositoryImpl implements PaymentRepository {
               .where((payment) => payment != null)
               .cast<Payment>()
               .toList();
-          print('✅ PaymentRepository: Successfully parsed ${payments.length} payments for status ${status.name}');
+
+          // Skip the first 'offset' items and take only 'limit' items
+          final payments = offset > 0 && allPayments.length > offset
+              ? allPayments.skip(offset).take(limit).toList()
+              : allPayments.take(limit).toList();
+
+          print('✅ PaymentRepository: Successfully parsed ${payments.length} payments for status ${status.name} (offset: $offset)');
           return payments;
         });
   }

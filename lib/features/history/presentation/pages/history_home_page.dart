@@ -122,6 +122,7 @@ class _HistoryHomePageState extends State<HistoryHomePage>
                   onLoadMore: () {
                     context.read<HistoryBloc>().add(LoadMoreSuccessPayments());
                   },
+                  hasMore: state.hasMoreSuccess,
                 ),
                 _buildPaymentsList(
                   payments: state.failedPayments,
@@ -130,6 +131,7 @@ class _HistoryHomePageState extends State<HistoryHomePage>
                   onLoadMore: () {
                     context.read<HistoryBloc>().add(LoadMoreFailedPayments());
                   },
+                  hasMore: state.hasMoreFailed,
                 ),
               ],
             );
@@ -146,6 +148,7 @@ class _HistoryHomePageState extends State<HistoryHomePage>
     required String emptyMessage,
     required bool isLoadingMore,
     required VoidCallback onLoadMore,
+    required bool hasMore,
   }) {
     if (payments.isEmpty) {
       return Center(
@@ -173,14 +176,38 @@ class _HistoryHomePageState extends State<HistoryHomePage>
       },
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: payments.length + (isLoadingMore ? 1 : 0),
+        itemCount: payments.length + 1, // +1 for show more button/message
         itemBuilder: (context, index) {
           if (index == payments.length) {
-            // Loading indicator for pagination
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            // Show More button or end message
+            if (isLoadingMore) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            } else if (hasMore) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: ElevatedButton(
+                    onPressed: onLoadMore,
+                    child: const Text('Show More'),
+                  ),
+                ),
+              );
+            } else {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'No more payments',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+              );
+            }
           }
 
           final payment = payments[index];

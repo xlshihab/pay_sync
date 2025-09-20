@@ -28,18 +28,26 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       _successSubscription?.cancel();
 
       await emit.forEach(
-        _paymentRepository.getPaymentsByStatus(PaymentStatus.success, limit: 10),
+        _paymentRepository.getPaymentsByStatus(PaymentStatus.success, limit: 10, offset: 0),
         onData: (payments) {
           print('📦 HistoryBloc: Received ${payments.length} success payments');
           print('✅ HistoryBloc: Emitting HistoryLoaded state for success payments');
 
+          final hasMore = payments.length == 10;
+
           if (state is HistoryLoaded) {
             final currentState = state as HistoryLoaded;
-            return currentState.copyWith(successPayments: payments);
+            return currentState.copyWith(
+              successPayments: payments,
+              hasMoreSuccess: hasMore,
+              successPage: 0,
+            );
           } else {
             return HistoryLoaded(
               successPayments: payments,
               failedPayments: const [],
+              hasMoreSuccess: hasMore,
+              successPage: 0,
             );
           }
         },
@@ -64,18 +72,26 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       _failedSubscription?.cancel();
 
       await emit.forEach(
-        _paymentRepository.getPaymentsByStatus(PaymentStatus.failed, limit: 10),
+        _paymentRepository.getPaymentsByStatus(PaymentStatus.failed, limit: 10, offset: 0),
         onData: (payments) {
           print('📦 HistoryBloc: Received ${payments.length} failed payments');
           print('✅ HistoryBloc: Emitting HistoryLoaded state for failed payments');
 
+          final hasMore = payments.length == 10;
+
           if (state is HistoryLoaded) {
             final currentState = state as HistoryLoaded;
-            return currentState.copyWith(failedPayments: payments);
+            return currentState.copyWith(
+              failedPayments: payments,
+              hasMoreFailed: hasMore,
+              failedPage: 0,
+            );
           } else {
             return HistoryLoaded(
               successPayments: const [],
               failedPayments: payments,
+              hasMoreFailed: hasMore,
+              failedPage: 0,
             );
           }
         },
@@ -90,12 +106,80 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
     }
   }
 
-  void _onLoadMoreSuccessPayments(LoadMoreSuccessPayments event, Emitter<HistoryState> emit) {
-    // TODO: Implement pagination for more success payments
+  Future<void> _onLoadMoreSuccessPayments(LoadMoreSuccessPayments event, Emitter<HistoryState> emit) async {
+    if (state is! HistoryLoaded) return;
+
+    final currentState = state as HistoryLoaded;
+    if (!currentState.hasMoreSuccess || currentState.isLoadingMoreSuccess) return;
+
+    emit(currentState.copyWith(isLoadingMoreSuccess: true));
+
+    try {
+      final nextPage = currentState.successPage + 1;
+      final offset = nextPage * 10;
+
+      await emit.forEach(
+        _paymentRepository.getPaymentsByStatus(PaymentStatus.success, limit: 10, offset: offset),
+        onData: (newPayments) {
+          print('📦 HistoryBloc: Received ${newPayments.length} more success payments');
+
+          final allPayments = [...currentState.successPayments, ...newPayments];
+          final hasMore = newPayments.length == 10;
+
+          return currentState.copyWith(
+            successPayments: allPayments,
+            isLoadingMoreSuccess: false,
+            hasMoreSuccess: hasMore,
+            successPage: nextPage,
+          );
+        },
+        onError: (error, stackTrace) {
+          print('❌ HistoryBloc: Load more success payments error - $error');
+          return currentState.copyWith(isLoadingMoreSuccess: false);
+        },
+      );
+    } catch (error) {
+      print('💥 HistoryBloc: Exception in _onLoadMoreSuccessPayments - $error');
+      emit(currentState.copyWith(isLoadingMoreSuccess: false));
+    }
   }
 
-  void _onLoadMoreFailedPayments(LoadMoreFailedPayments event, Emitter<HistoryState> emit) {
-    // TODO: Implement pagination for more failed payments
+  Future<void> _onLoadMoreFailedPayments(LoadMoreFailedPayments event, Emitter<HistoryState> emit) async {
+    if (state is! HistoryLoaded) return;
+
+    final currentState = state as HistoryLoaded;
+    if (!currentState.hasMoreFailed || currentState.isLoadingMoreFailed) return;
+
+    emit(currentState.copyWith(isLoadingMoreFailed: true));
+
+    try {
+      final nextPage = currentState.failedPage + 1;
+      final offset = nextPage * 10;
+
+      await emit.forEach(
+        _paymentRepository.getPaymentsByStatus(PaymentStatus.failed, limit: 10, offset: offset),
+        onData: (newPayments) {
+          print('📦 HistoryBloc: Received ${newPayments.length} more failed payments');
+
+          final allPayments = [...currentState.failedPayments, ...newPayments];
+          final hasMore = newPayments.length == 10;
+
+          return currentState.copyWith(
+            failedPayments: allPayments,
+            isLoadingMoreFailed: false,
+            hasMoreFailed: hasMore,
+            failedPage: nextPage,
+          );
+        },
+        onError: (error, stackTrace) {
+          print('❌ HistoryBloc: Load more failed payments error - $error');
+          return currentState.copyWith(isLoadingMoreFailed: false);
+        },
+      );
+    } catch (error) {
+      print('💥 HistoryBloc: Exception in _onLoadMoreFailedPayments - $error');
+      emit(currentState.copyWith(isLoadingMoreFailed: false));
+    }
   }
 
   void _onRefreshPayments(RefreshPayments event, Emitter<HistoryState> emit) {
