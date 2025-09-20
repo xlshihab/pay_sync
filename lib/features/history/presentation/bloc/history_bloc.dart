@@ -19,7 +19,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   }
 
   Future<void> _onLoadSuccessPayments(LoadSuccessPayments event, Emitter<HistoryState> emit) async {
-    print('🚀 HistoryBloc: Starting to load success payments');
     if (state is! HistoryLoaded) {
       emit(HistoryLoading());
     }
@@ -30,9 +29,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       await emit.forEach(
         _paymentRepository.getPaymentsByStatus(PaymentStatus.success, limit: 10, offset: 0),
         onData: (payments) {
-          print('📦 HistoryBloc: Received ${payments.length} success payments');
-          print('✅ HistoryBloc: Emitting HistoryLoaded state for success payments');
-
           final hasMore = payments.length == 10;
 
           if (state is HistoryLoaded) {
@@ -52,18 +48,15 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           }
         },
         onError: (error, stackTrace) {
-          print('❌ HistoryBloc: Success payments stream error - $error');
           return HistoryError('Failed to load success payments: $error');
         },
       );
     } catch (error) {
-      print('💥 HistoryBloc: Exception in _onLoadSuccessPayments - $error');
       emit(HistoryError('Failed to load success payments: $error'));
     }
   }
 
   Future<void> _onLoadFailedPayments(LoadFailedPayments event, Emitter<HistoryState> emit) async {
-    print('🚀 HistoryBloc: Starting to load failed payments');
     if (state is! HistoryLoaded) {
       emit(HistoryLoading());
     }
@@ -74,9 +67,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       await emit.forEach(
         _paymentRepository.getPaymentsByStatus(PaymentStatus.failed, limit: 10, offset: 0),
         onData: (payments) {
-          print('📦 HistoryBloc: Received ${payments.length} failed payments');
-          print('✅ HistoryBloc: Emitting HistoryLoaded state for failed payments');
-
           final hasMore = payments.length == 10;
 
           if (state is HistoryLoaded) {
@@ -96,12 +86,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           }
         },
         onError: (error, stackTrace) {
-          print('❌ HistoryBloc: Failed payments stream error - $error');
           return HistoryError('Failed to load failed payments: $error');
         },
       );
     } catch (error) {
-      print('💥 HistoryBloc: Exception in _onLoadFailedPayments - $error');
       emit(HistoryError('Failed to load failed payments: $error'));
     }
   }
@@ -121,8 +109,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       await emit.forEach(
         _paymentRepository.getPaymentsByStatus(PaymentStatus.success, limit: 10, offset: offset),
         onData: (newPayments) {
-          print('📦 HistoryBloc: Received ${newPayments.length} more success payments');
-
           final allPayments = [...currentState.successPayments, ...newPayments];
           final hasMore = newPayments.length == 10;
 
@@ -134,12 +120,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           );
         },
         onError: (error, stackTrace) {
-          print('❌ HistoryBloc: Load more success payments error - $error');
           return currentState.copyWith(isLoadingMoreSuccess: false);
         },
       );
     } catch (error) {
-      print('💥 HistoryBloc: Exception in _onLoadMoreSuccessPayments - $error');
       emit(currentState.copyWith(isLoadingMoreSuccess: false));
     }
   }
@@ -159,8 +143,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       await emit.forEach(
         _paymentRepository.getPaymentsByStatus(PaymentStatus.failed, limit: 10, offset: offset),
         onData: (newPayments) {
-          print('📦 HistoryBloc: Received ${newPayments.length} more failed payments');
-
           final allPayments = [...currentState.failedPayments, ...newPayments];
           final hasMore = newPayments.length == 10;
 
@@ -172,12 +154,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           );
         },
         onError: (error, stackTrace) {
-          print('❌ HistoryBloc: Load more failed payments error - $error');
           return currentState.copyWith(isLoadingMoreFailed: false);
         },
       );
     } catch (error) {
-      print('💥 HistoryBloc: Exception in _onLoadMoreFailedPayments - $error');
       emit(currentState.copyWith(isLoadingMoreFailed: false));
     }
   }

@@ -11,7 +11,6 @@ class PaymentRepositoryImpl implements PaymentRepository {
 
   @override
   Stream<List<Payment>> getPaymentsByStatus(PaymentStatus status, {int limit = 10, int offset = 0}) {
-    print('🔍 PaymentRepository: Querying payments with status: ${status.name}, limit: $limit, offset: $offset');
 
     return _firestore
         .collection(_collection)
@@ -20,14 +19,12 @@ class PaymentRepositoryImpl implements PaymentRepository {
         .limit(limit + offset) // Get more data to skip
         .snapshots()
         .map((snapshot) {
-          print('📄 PaymentRepository: Received ${snapshot.docs.length} documents for status ${status.name}');
 
           final allPayments = snapshot.docs
               .map((doc) {
                 try {
                   return PaymentModel.fromFirestore(doc).toEntity();
                 } catch (e) {
-                  print('❌ Error parsing document ${doc.id}: $e');
                   return null;
                 }
               })
@@ -40,7 +37,6 @@ class PaymentRepositoryImpl implements PaymentRepository {
               ? allPayments.skip(offset).take(limit).toList()
               : allPayments.take(limit).toList();
 
-          print('✅ PaymentRepository: Successfully parsed ${payments.length} payments for status ${status.name} (offset: $offset)');
           return payments;
         });
   }

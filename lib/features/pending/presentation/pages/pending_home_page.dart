@@ -31,14 +31,6 @@ class _PendingHomePageState extends State<PendingHomePage> {
     return Scaffold(
       appBar: AppBarWithThemeToggle(
         title: 'Pending Payments',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<PendingBloc>().add(RefreshPendingPayments());
-            },
-          ),
-        ],
       ),
       body: BlocListener<PendingBloc, PendingState>(
         listener: (context, state) {

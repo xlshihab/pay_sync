@@ -16,7 +16,6 @@ class PendingBloc extends Bloc<PendingEvent, PendingState> {
   }
 
   Future<void> _onLoadPendingPayments(LoadPendingPayments event, Emitter<PendingState> emit) async {
-    print('🚀 PendingBloc: Starting to load pending payments');
     emit(PendingLoading());
 
     try {
@@ -25,17 +24,13 @@ class PendingBloc extends Bloc<PendingEvent, PendingState> {
       await emit.forEach(
         _paymentRepository.getPaymentsByStatus(PaymentStatus.pending),
         onData: (payments) {
-          print('📦 PendingBloc: Received ${payments.length} pending payments');
-          print('✅ PendingBloc: Emitting PendingLoaded state with ${payments.length} payments');
-          return PendingLoaded(pendingPayments: payments);
+          return PendingLoaded( pendingPayments: payments);
         },
         onError: (error, stackTrace) {
-          print('❌ PendingBloc: Stream error - $error');
           return PendingError('Failed to load pending payments: $error');
         },
       );
     } catch (error) {
-      print('💥 PendingBloc: Exception in _onLoadPendingPayments - $error');
       emit(PendingError('Failed to load pending payments: $error'));
     }
   }
