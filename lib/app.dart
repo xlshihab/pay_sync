@@ -5,6 +5,8 @@ import 'core/theme/theme_data.dart';
 import 'core/routes/app_router.dart';
 import 'core/di/injection_container.dart' as di;
 import 'features/money_receive/presentation/bloc/money_receive_bloc.dart';
+import 'features/history/presentation/bloc/history_bloc.dart';
+import 'features/pending/presentation/bloc/pending_bloc.dart';
 
 class PaySyncApp extends StatelessWidget {
   const PaySyncApp({super.key});
@@ -18,6 +20,12 @@ class PaySyncApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (context) => di.sl<MoneyReceiveBloc>(),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<HistoryBloc>(),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<PendingBloc>(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(

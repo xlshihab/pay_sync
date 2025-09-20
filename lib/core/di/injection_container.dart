@@ -6,6 +6,11 @@ import '../../features/money_receive/domain/repositories/money_receive_repositor
 import '../../features/money_receive/domain/usecases/get_unmatched_payments_use_case.dart';
 import '../../features/money_receive/domain/usecases/delete_unmatched_payment_use_case.dart';
 import '../../features/money_receive/presentation/bloc/money_receive_bloc.dart';
+// Payment features
+import '../../features/payments/data/repositories/payment_repository_impl.dart';
+import '../../features/payments/domain/repositories/payment_repository.dart';
+import '../../features/history/presentation/bloc/history_bloc.dart';
+import '../../features/pending/presentation/bloc/pending_bloc.dart';
 import '../theme/theme_cubit.dart';
 
 final GetIt sl = GetIt.instance;
@@ -19,6 +24,9 @@ Future<void> init() async {
 
   // Money Receive Feature
   _initMoneyReceive();
+
+  // Payment Features
+  _initPayments();
 }
 
 void _initMoneyReceive() {
@@ -41,4 +49,14 @@ void _initMoneyReceive() {
   // Data sources
   sl.registerLazySingleton<MoneyReceiveRemoteDataSource>(
       () => MoneyReceiveRemoteDataSourceImpl(firestore: sl()));
+}
+
+void _initPayments() {
+  // Blocs
+  sl.registerFactory<HistoryBloc>(() => HistoryBloc(sl()));
+  sl.registerFactory<PendingBloc>(() => PendingBloc(sl()));
+
+  // Repository
+  sl.registerLazySingleton<PaymentRepository>(
+      () => PaymentRepositoryImpl(sl()));
 }
